@@ -1,0 +1,32 @@
+.{
+    .name = .stablediffusioncpp,
+    // Upstream's build number (master-<N>-<commit>) as the major version.
+    .version = "1088.0.0",
+    .fingerprint = 0x8b9a95ea0fb07271,
+    .minimum_zig_version = "0.17.0",
+    // Only this build system. The stable-diffusion.cpp and ggml sources are
+    // the packages below, unpacked into zig-pkg/ and not part of this package.
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "Makefile",
+        "zig",
+    },
+    .dependencies = .{
+        .zigbuildx = .{
+            .url = "git+https://github.com/mlavergn/zigbuildx?ref=v6.0.0#46768094ba0c15caf794a3a7e8bfdde5441c38bf",
+            .hash = "zigbuildx-6.0.0-9koPhBcPBQD2jCWWdnTk-0rvM1jNFv1UBCqc4kuseiEG",
+        },
+        // Upstream's release tarball. It ships without its git submodules.
+        .stablediffusion_cpp = .{
+            .url = "https://github.com/leejet/stable-diffusion.cpp/archive/refs/tags/master-1088-32d516c.tar.gz",
+            .hash = "N-V-__8AAEpCHxBJiV2wxkNz0aZ7XKYykig-sqv4_PrBLxAB",
+        },
+        // The `ggml` submodule: leejet's patched fork, at the commit the tag
+        // above points it at. `make pin` keeps the two in step.
+        .ggml = .{
+            .url = "https://github.com/leejet/ggml/archive/d803c238f67915fb825a9aa4df27b99356d51597.tar.gz",
+            .hash = "N-V-__8AAFRJkQEmDsNgCdnuWTBGwkfC7fzRZx6xDCPEw-xB",
+        },
+    },
+}
