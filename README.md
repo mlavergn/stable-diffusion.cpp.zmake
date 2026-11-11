@@ -22,23 +22,25 @@ release uses (leejet's patched fork, carried upstream as a git submodule).
 
 A build counts as correct only when it generates **the same image, pixel for
 pixel**, as upstream's CMake build of the same sources, model, prompt and seed.
-`make verify` checks exactly that, on Metal and on the CPU.
+`make verify` checks exactly that, on Metal, CUDA and the CPU.
 
 ### Status
 
 | Platform | Backends | State |
 | -------- | -------- | ----- |
 | macOS, Apple Silicon | Metal, CPU | Built and verified identical to CMake |
+| Linux arm64 (DGX Spark, GB10) | CUDA, CPU | Built on the host and verified identical to CMake |
 | Linux arm64, x86_64 | CPU | Cross-compiled; not yet run |
 
-Not available: Vulkan and CUDA backends; WebP/WebM output (PNG and JPEG
-work); `sd-server`'s browser UI (its API works). The last two depend on
-upstream submodules that are not in the release download.
+Not available: the Vulkan backend; CUDA's CUTLASS kernels; WebP/WebM output
+(PNG and JPEG work); `sd-server`'s browser UI (its API works). The last three
+depend on upstream submodules that are not in the release download.
 
 ## Requirements
 
 - Zig 0.17.0
-- macOS on Apple Silicon with Xcode
+- macOS on Apple Silicon with Xcode, or Linux; for CUDA, the CUDA toolkit
+  (12.8 or later for Blackwell) and g++
 - `curl`, for downloading the model weights (about 5.4 GB)
 - `python3`, only for `make ref`, which builds the CMake reference to verify
   against
@@ -72,8 +74,17 @@ Everything is a `make` variable, overridable on the command line:
 | `MODEL_URL`, `VAE_URL` | the Hugging Face files below | `models` |
 | `WEB_HOST`, `WEB_PORT` | `127.0.0.1`, `1234` | `web` |
 | `RELEASE` | `--release=fast` (`RELEASE=` builds Debug) | every build |
-| `VERIFY_BACKENDS` | `metal cpu` | `verify` |
+| `CUDA` | `true` on Linux when `$(CUDA_PATH)/bin/nvcc` exists | every host build, `ref` |
+| `CUDA_PATH` | `/usr/local/cuda` | every host build, `ref` |
+| `CUDA_ARCH` | the host GPU's, from `nvidia-smi` (`121-real` on a GB10) | every host build, `ref` |
+| `VERIFY_BACKENDS` | `metal cpu` on macOS, `cuda cpu` on Linux with CUDA | `verify` |
 | `VERIFY_DIR` | `out/verify` | `verify` |
+| `PERF_BIN` | `zig-out/bin/sd-cli` | `perf` |
+| `PERF_RUNS` | `3` | `perf` |
+| `PERF_WIDTH`, `PERF_HEIGHT` | `1024`, `1024` | `perf` |
+| `PERF_PPI` | `72` | `perf` |
+| `PERF_ARGS` | none; extra `sd-cli` arguments, e.g. `--backend cpu` | `perf` |
+| `PERF_DIR` | `out/perf` | `perf` |
 
 **Weights.** `make models` (or any target that needs them) downloads SDXL base
 as a Q8_0 GGUF from `gpustack/stable-diffusion-xl-base-1.0-GGUF`, and the
@@ -125,11 +136,31 @@ make linux linux-x86_64     # sd-cli for Linux, into zig-out/linux*/
 Check this build against CMake. `make ref` builds upstream's CMake `sd-cli`
 from the same sources into `.ref/`; `make verify` has both generate the same
 images and compares them pixel by pixel. The CPU case takes minutes at
-1024x1024; `make verify-metal` runs Metal alone.
+1024x1024; `make verify-metal` or `make verify-cuda` runs the GPU alone.
+
+On Linux the reference's C and C++ compiler is Zig's clang rather than
+CMake's default gcc: the two compile the same host-side float math to results
+that differ in the last bit, which the sampler grows into visible drift.
+Against gcc the images look the same but are not identical pixel for pixel.
 
 ```sh
 make ref
 make verify
+```
+
+Time an already-built `sd-cli` from request to response, `PERF_RUNS` times.
+It builds nothing, so run `make cli` first. The time is `sd-cli`'s own
+`generate_image`, from the prompt to the decoded image, split into
+conditioning, sampling and decoding; the weights it uploads during the request
+are included and also shown alone, and start-up and model parsing are not.
+Each image is a 1024x1024 PNG in 8-bit RGB at 72 ppi (`PERF_WIDTH`,
+`PERF_HEIGHT`, `PERF_PPI`): `sd-cli` records no resolution, so a small tool
+stamps it afterwards, outside the timing, without touching the pixels.
+`PERF_BIN=.ref/build/bin/sd-cli` times the CMake build the same way:
+
+```sh
+make perf
+make perf PERF_RUNS=5 STEPS=4
 ```
 
 Move to another upstream release (the version strings follow the pin):
@@ -144,7 +175,7 @@ make pin SD_CPP_TAG=master-<N>-<commit>
 build.zig            the build: ggml, libstable-diffusion, sd-cli, sd-server
 build.zig.zon        the pins: stable-diffusion.cpp, its ggml, zigbuildx
 Makefile             every entry point above
-zig/                 small Zig tools the build and make verify use
+zig/                 small Zig tools the build, make verify and make perf use
 zig-pkg/<hash>/      the fetched upstream sources (gitignored, never edited)
 models/              downloaded weights (gitignored)
 out/                 generated images (gitignored)

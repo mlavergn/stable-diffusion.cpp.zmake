@@ -1,7 +1,7 @@
 .{
     .name = .stablediffusioncpp,
     // Upstream's build number (master-<N>-<commit>) as the major version.
-    .version = "1088.0.0",
+    .version = "1088.0.0+1",
     .fingerprint = 0x8b9a95ea0fb07271,
     .minimum_zig_version = "0.17.0",
     // Only this build system. The stable-diffusion.cpp and ggml sources are

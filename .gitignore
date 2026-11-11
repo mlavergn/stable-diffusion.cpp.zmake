@@ -4,7 +4,7 @@ zig-out/
 .gitmodule
 .claude
 zig-pkg/
-.ref/
+.ref*/
 models/
 out/
 
